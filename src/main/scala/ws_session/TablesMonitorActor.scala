@@ -2,9 +2,10 @@ package ws_session
 
 import akka.actor.{Actor, ActorRef}
 import repository.TablesTableRepository
-import repository.models.FTable
+import repository.models.{FTable, User}
 import slick.jdbc.PostgresProfile.api._
-import ws_session._
+
+import scala.concurrent.Await
 
 
 
@@ -17,15 +18,24 @@ class TablesMonitorActor(db: Database) extends Actor{
   var tables: List[FTable] = List.empty[FTable]
   override def receive: Receive = {
     //TODO: Subscription by username not by session
-    case SubscribeTables(user: ActorRef) => subscriptions += user; user ! TableList(tables)
-    case UnsubscribeTables(user: ActorRef) => subscriptions -= user
-    case UpdateTable(table: FTable, user: ActorRef) =>
+    case SubscribeTables => subscriptions += sender
+      tablesRep.getAll.foreach{seqTables =>
+      sender ! TableList(seqTables)}
+    case UnsubscribeTables => subscriptions -= sender
+
+    case AddUser(afterId, table) =>
+      tablesRep.create(table).foreach{res => subscriptions.foreach(_ ! TableAdded(res))}
+
+    case UpdateUser(table: FTable) =>
       tablesRep.update(table).foreach{res =>
         if(res > 0) subscriptions.foreach(_ ! TableUpdated(table))
-        else user ! UpdateFailed(table.id)
+        else sender ! UpdateFailed(table.id)
       }
-    case AddTable(table: FTable, user: ActorRef) => subscriptions.foreach(_ ! TableAdded(table))
-    case RemoveTable(table: FTable, user: ActorRef) => subscriptions.foreach(_ ! TableRemoved(table))
+    case RemoveUser(tableId: Long) =>
+      tablesRep.remove(tableId).foreach{res =>
+        if(res > 0) subscriptions.foreach(_ ! TableRemoved(tableId))
+        else sender ! RemovalFailed(tableId)
+      }
     case _ =>
   }
 }

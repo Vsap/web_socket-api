@@ -37,6 +37,10 @@ class UsersRepository(db: Database){
     UsersTable.table.filter(_.username === username).result.head
   )
 
+  def getUser(user: User): Future[Option[User]] = db.run(
+    UsersTable.table.filter{u => u.username === user.username && u.password === user.password}.result.headOption
+  )
+
   def getSubscribedTables(name: String): Future[Seq[FTable]] = {
     val query = for{
       table <- TablesTable.table.filter(_.id in

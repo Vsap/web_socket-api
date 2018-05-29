@@ -11,13 +11,14 @@ import scala.concurrent.Future
 class TablesTable(tag: Tag) extends Table[FTable] (tag, "tables"){
   val id = column[Long]("id", O.PrimaryKey, O.AutoInc)
   val name = column[String]("name")
+  val participants = column[Int]("participants")
 
-  def * = (id, name) <> (FTable.apply _ tupled, FTable.unapply)
+  def * = (id, name, participants).mapTo[FTable]
 }
 
 
 object TablesTable{
-  val table = TableQuery[TablesTable]
+  lazy val table = TableQuery[TablesTable]
 }
 
 
@@ -39,9 +40,14 @@ class TablesTableRepository(db: Database){
     TablesTable.table.filter(_.name === name).result.head
   )
 
-//  def countParticipants(tableId: Long): Future[Int] = db.run(
-//    UsersToTablesTable.table.filter(_.tableId === tableId).result
-//  )
+  def remove(tableId: Long): Future[Int] = db.run(
+    TablesTable.table.filter(_.id === tableId).delete
+  )
+
+  def getAll: Future[Seq[FTable]] = db.run(
+    TablesTable.table.result
+  )
+
 
 
   def getParticipants(tableId: Long): Future[Seq[User]] = {
